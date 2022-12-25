@@ -19,6 +19,7 @@ package centralinstance
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -36,8 +37,8 @@ import (
 
 	"github.com/stehessel/provider-redhat/apis/rhacs/v1alpha1"
 	apisv1alpha1 "github.com/stehessel/provider-redhat/apis/v1alpha1"
-	"github.com/stehessel/provider-redhat/pkg/controller/features"
 	"github.com/stehessel/provider-redhat/pkg/clients/rhacs"
+	"github.com/stehessel/provider-redhat/pkg/controller/features"
 )
 
 const (
@@ -45,6 +46,7 @@ const (
 	errTrackPCUsage       = "cannot track ProviderConfig usage"
 	errGetPC              = "cannot get ProviderConfig"
 	errGetCreds           = "cannot get credentials"
+	errGetInstance        = "cannot get central instance"
 	errNewClient          = "cannot create rhacs client"
 	errNewInstance        = "cannot create central instance"
 )
@@ -128,23 +130,27 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotCentralInstance)
 	}
 
-	// These fmt statements should be removed in the real implementation.
-	fmt.Printf("Observing: %+v", cr)
+	if cr.Status.AtProvider.ID == "" {
+		return managed.ExternalObservation{}, nil
+	}
+
+	central, resp, err := c.client.GetCentralById(ctx, cr.Status.AtProvider.ID)
+	fmt.Printf("\n\nObserve: %+v, central: %+v, resp: %+v, err: %+v\n\n", cr, central, resp, err)
+	if err != nil {
+		if resp != nil && resp.StatusCode == http.StatusNotFound {
+			return managed.ExternalObservation{}, nil
+		}
+		return managed.ExternalObservation{}, errors.Wrap(err, errGetInstance)
+	}
+
+	upToDate := false
+	if central.Name == cr.Spec.ForProvider.Name {
+		upToDate = true
+	}
 
 	return managed.ExternalObservation{
-		// Return false when the external resource does not exist. This lets
-		// the managed resource reconciler know that it needs to call Create to
-		// (re)create the resource, or that it has successfully been deleted.
-		ResourceExists: true,
-
-		// Return false when the external resource exists, but it not up to date
-		// with the desired managed resource state. This lets the managed
-		// resource reconciler know that it needs to call Update.
-		ResourceUpToDate: true,
-
-		// Return any details that may be required to connect to the external
-		// resource. These will be stored as the connection secret.
-		ConnectionDetails: managed.ConnectionDetails{},
+		ResourceExists:   true,
+		ResourceUpToDate: upToDate,
 	}, nil
 }
 
@@ -154,7 +160,6 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotCentralInstance)
 	}
 
-	fmt.Printf("Creating: %+v", cr)
 	request := public.CentralRequestPayload{
 		CloudProvider: cr.Spec.ForProvider.CloudProvider,
 		MultiAz:       cr.Spec.ForProvider.MultiAZ,
@@ -162,7 +167,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		Region:        cr.Spec.ForProvider.Region,
 	}
 	if _, _, err := c.client.CreateCentral(ctx, true, request); err != nil {
-		return managed.ExternalCreation{}, errors.New(errNewInstance)
+		return managed.ExternalCreation{}, errors.Wrap(err, errNewInstance)
 	}
 
 	return managed.ExternalCreation{
