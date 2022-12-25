@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
-	"github.com/stackrox/acs-fleet-manager/pkg/client/fleetmanager"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,11 +31,13 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/ratelimiter"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/stackrox/acs-fleet-manager/pkg/api/public"
+	"github.com/stackrox/acs-fleet-manager/pkg/client/fleetmanager"
 
 	"github.com/stehessel/provider-redhat/apis/rhacs/v1alpha1"
 	apisv1alpha1 "github.com/stehessel/provider-redhat/apis/v1alpha1"
-	"github.com/stehessel/provider-redhat/pkg/clients/rhacs"
 	"github.com/stehessel/provider-redhat/pkg/controller/features"
+	"github.com/stehessel/provider-redhat/pkg/clients/rhacs"
 )
 
 const (
@@ -45,6 +46,7 @@ const (
 	errGetPC              = "cannot get ProviderConfig"
 	errGetCreds           = "cannot get credentials"
 	errNewClient          = "cannot create rhacs client"
+	errNewInstance        = "cannot create central instance"
 )
 
 // Setup adds a controller that reconciles CentralInstance managed resources.
@@ -76,8 +78,8 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 // A connector is expected to produce an ExternalClient when its Connect method
 // is called.
 type connector struct {
-	kube         client.Client
-	usage        resource.Tracker
+	kube  client.Client
+	usage resource.Tracker
 }
 
 // Connect typically produces an ExternalClient by:
@@ -153,6 +155,15 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	}
 
 	fmt.Printf("Creating: %+v", cr)
+	request := public.CentralRequestPayload{
+		CloudProvider: cr.Spec.ForProvider.CloudProvider,
+		MultiAz:       cr.Spec.ForProvider.MultiAZ,
+		Name:          cr.Spec.ForProvider.Name,
+		Region:        cr.Spec.ForProvider.Region,
+	}
+	if _, _, err := c.client.CreateCentral(ctx, true, request); err != nil {
+		return managed.ExternalCreation{}, errors.New(errNewInstance)
+	}
 
 	return managed.ExternalCreation{
 		// Optionally return any details that may be required to connect to the
