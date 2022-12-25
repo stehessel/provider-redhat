@@ -20,15 +20,15 @@ package apis
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 
-	samplev1alpha1 "github.com/crossplane/provider-redhat/apis/sample/v1alpha1"
-	redhatv1alpha1 "github.com/crossplane/provider-redhat/apis/v1alpha1"
+	rhacsv1alpha1 "github.com/stehessel/provider-redhat/apis/rhacs/v1alpha1"
+	redhatv1alpha1 "github.com/stehessel/provider-redhat/apis/v1alpha1"
 )
 
 func init() {
 	// Register the types with the Scheme so the components can map objects to GroupVersionKinds and back
 	AddToSchemes = append(AddToSchemes,
 		redhatv1alpha1.SchemeBuilder.AddToScheme,
-		samplev1alpha1.SchemeBuilder.AddToScheme,
+		rhacsv1alpha1.SchemeBuilder.AddToScheme,
 	)
 }
 

@@ -20,8 +20,8 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/crossplane/provider-redhat/internal/controller/config"
-	"github.com/crossplane/provider-redhat/internal/controller/mytype"
+	"github.com/stehessel/provider-redhat/pkg/controller/centralinstance"
+	"github.com/stehessel/provider-redhat/pkg/controller/config"
 )
 
 // Setup creates all RedHat controllers with the supplied logger and adds them to
@@ -29,7 +29,7 @@ import (
 func Setup(mgr ctrl.Manager, o controller.Options) error {
 	for _, setup := range []func(ctrl.Manager, controller.Options) error{
 		config.Setup,
-		mytype.Setup,
+		centralinstance.Setup,
 	} {
 		if err := setup(mgr, o); err != nil {
 			return err

@@ -96,8 +96,12 @@ spec:
                 required:
                 - source
                 type: object
+              endpoint:
+                description: Endpoint of the OpenShift API gateway.
+                type: string
             required:
             - credentials
+            - endpoint
             type: object
           status:
             description: A ProviderConfigStatus reflects the observed state of a ProviderConfig.

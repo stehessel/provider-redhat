@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+	"github.com/stackrox/acs-fleet-manager/pkg/client/fleetmanager"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -32,25 +33,18 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
-	"github.com/crossplane/provider-redhat/apis/rhacs/v1alpha1"
-	apisv1alpha1 "github.com/crossplane/provider-redhat/apis/v1alpha1"
-	"github.com/crossplane/provider-redhat/internal/controller/features"
+	"github.com/stehessel/provider-redhat/apis/rhacs/v1alpha1"
+	apisv1alpha1 "github.com/stehessel/provider-redhat/apis/v1alpha1"
+	"github.com/stehessel/provider-redhat/pkg/clients/rhacs"
+	"github.com/stehessel/provider-redhat/pkg/controller/features"
 )
 
 const (
-	errNotCentralInstance    = "managed resource is not a CentralInstance custom resource"
-	errTrackPCUsage = "cannot track ProviderConfig usage"
-	errGetPC        = "cannot get ProviderConfig"
-	errGetCreds     = "cannot get credentials"
-
-	errNewClient = "cannot create new Service"
-)
-
-// A NoOpService does nothing.
-type NoOpService struct{}
-
-var (
-	newNoOpService = func(_ []byte) (interface{}, error) { return &NoOpService{}, nil }
+	errNotCentralInstance = "managed resource is not a CentralInstance custom resource"
+	errTrackPCUsage       = "cannot track ProviderConfig usage"
+	errGetPC              = "cannot get ProviderConfig"
+	errGetCreds           = "cannot get credentials"
+	errNewClient          = "cannot create rhacs client"
 )
 
 // Setup adds a controller that reconciles CentralInstance managed resources.
@@ -65,9 +59,9 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 	r := managed.NewReconciler(mgr,
 		resource.ManagedKind(v1alpha1.CentralInstanceGroupVersionKind),
 		managed.WithExternalConnecter(&connector{
-			kube:         mgr.GetClient(),
-			usage:        resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
-			newServiceFn: newNoOpService}),
+			kube:  mgr.GetClient(),
+			usage: resource.NewProviderConfigUsageTracker(mgr.GetClient(), &apisv1alpha1.ProviderConfigUsage{}),
+		}),
 		managed.WithLogger(o.Logger.WithValues("controller", name)),
 		managed.WithRecorder(event.NewAPIRecorder(mgr.GetEventRecorderFor(name))),
 		managed.WithConnectionPublishers(cps...))
@@ -84,7 +78,6 @@ func Setup(mgr ctrl.Manager, o controller.Options) error {
 type connector struct {
 	kube         client.Client
 	usage        resource.Tracker
-	newServiceFn func(creds []byte) (interface{}, error)
 }
 
 // Connect typically produces an ExternalClient by:
@@ -112,21 +105,19 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	if err != nil {
 		return nil, errors.Wrap(err, errGetCreds)
 	}
+	stringData := string(data)
 
-	svc, err := c.newServiceFn(data)
+	client, err := rhacs.New(stringData, pc.Spec.Endpoint)
 	if err != nil {
 		return nil, errors.Wrap(err, errNewClient)
 	}
-
-	return &external{service: svc}, nil
+	return &external{client: client}, nil
 }
 
 // An ExternalClient observes, then either creates, updates, or deletes an
 // external resource to ensure it reflects the managed resource's desired state.
 type external struct {
-	// A 'client' used to connect to the external resource API. In practice this
-	// would be something like an AWS SDK client.
-	service interface{}
+	client fleetmanager.PublicAPI
 }
 
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {

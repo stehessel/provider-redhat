@@ -36,10 +36,10 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/ratelimiter"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
-	"github.com/crossplane/provider-redhat/apis"
-	"github.com/crossplane/provider-redhat/apis/v1alpha1"
-	redhat "github.com/crossplane/provider-redhat/internal/controller"
-	"github.com/crossplane/provider-redhat/internal/controller/features"
+	"github.com/stehessel/provider-redhat/apis"
+	"github.com/stehessel/provider-redhat/apis/v1alpha1"
+	redhat "github.com/stehessel/provider-redhat/pkg/controller"
+	"github.com/stehessel/provider-redhat/pkg/controller/features"
 )
 
 func main() {

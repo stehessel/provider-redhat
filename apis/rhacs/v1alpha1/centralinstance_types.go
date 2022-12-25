@@ -27,12 +27,66 @@ import (
 
 // CentralInstanceParameters are the configurable fields of a CentralInstance.
 type CentralInstanceParameters struct {
-	ConfigurableField string `json:"configurableField"`
+	// Name of the Central instance.
+	Name string `json:"name"`
+
+	// CloudProvider to which Central is deployed.
+	CloudProvider string `json:"cloudProvider"`
+
+	// Region defines the geographical region which hosts Central.
+	Region string `json:"region"`
+
+	// MultiAZ defines if Central is deployed to a cluster with multiple availability zones.
+	// +kubebuilder:default=true
+	MultiAZ bool `json:"multiAZ"`
 }
 
 // CentralInstanceObservation are the observable fields of a CentralInstance.
 type CentralInstanceObservation struct {
-	ObservableField string `json:"observableField,omitempty"`
+	// CentralDataURL represents Central's data URL.
+	CentralDataURL string `json:"centralDataURL,omitempty"`
+
+	// CentralUIURL represents Central's UI URL.
+	CentralUIURL string `json:"centralUIURL,omitempty"`
+
+	// CloudProvider to which Central is deployed.
+	CloudProvider string `json:"cloudProvider,omitempty"`
+
+	// CreatedAt defines the timestamp at which Central was created.
+	CreatedAt metav1.Time `json:"createdAt,omitempty"`
+
+	// HRef represents the API path of Central in the RHACS fleet manager.
+	HRef string `json:"href,omitempty"`
+
+	// ID represents a unique identifier for Central.
+	ID string `json:"id,omitempty"`
+
+	// InstanceType defines the purchasing type of Central.
+	InstanceType string `json:"instanceType,omitempty"`
+
+	// Kind defines the Central kind.
+	Kind string `json:"kind,omitempty"`
+
+	// MultiAZ defines if Central is deployed to a cluster with multiple availability zones.
+	MultiAZ bool `json:"multiAZ,omitempty"`
+
+	// Name of the Central instance.
+	Name string `json:"name,omitempty"`
+
+	// Owner of the Central instance.
+	Owner string `json:"owner,omitempty"`
+
+	// Region defines the geographical region which hosts Central.
+	Region string `json:"region,omitempty"`
+
+	// Status defines the status of Central.
+	Status string `json:"status,omitempty"`
+
+	// CreatedAt defines the timestamp at which Central was last updated.
+	UpdatedAt metav1.Time `json:"updatedAt,omitempty"`
+
+	// Version represents the Central version.
+	Version string `json:"version,omitempty"`
 }
 
 // A CentralInstanceSpec defines the desired state of a CentralInstance.

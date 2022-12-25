@@ -5,18 +5,18 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.10.0
   creationTimestamp: null
-  name: mytypes.sample.redhat.crossplane.io
+  name: centralinstances.rhacs.redhat.crossplane.io
 spec:
-  group: sample.redhat.crossplane.io
+  group: rhacs.redhat.crossplane.io
   names:
     categories:
     - crossplane
     - managed
     - redhat
-    kind: MyType
-    listKind: MyTypeList
-    plural: mytypes
-    singular: mytype
+    kind: CentralInstance
+    listKind: CentralInstanceList
+    plural: centralinstances
+    singular: centralinstance
   scope: Cluster
   versions:
   - additionalPrinterColumns:
@@ -35,7 +35,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: A MyType is an example API type.
+        description: A CentralInstance is an example API type.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -50,7 +50,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: A MyTypeSpec defines the desired state of a MyType.
+            description: A CentralInstanceSpec defines the desired state of a CentralInstance.
             properties:
               deletionPolicy:
                 default: Delete
@@ -62,12 +62,29 @@ spec:
                 - Delete
                 type: string
               forProvider:
-                description: MyTypeParameters are the configurable fields of a MyType.
+                description: CentralInstanceParameters are the configurable fields
+                  of a CentralInstance.
                 properties:
-                  configurableField:
+                  cloudProvider:
+                    description: CloudProvider to which Central is deployed.
+                    type: string
+                  multiAZ:
+                    default: true
+                    description: MultiAZ defines if Central is deployed to a cluster
+                      with multiple availability zones.
+                    type: boolean
+                  name:
+                    description: Name of the Central instance.
+                    type: string
+                  region:
+                    description: Region defines the geographical region which hosts
+                      Central.
                     type: string
                 required:
-                - configurableField
+                - cloudProvider
+                - multiAZ
+                - name
+                - region
                 type: object
               providerConfigRef:
                 default:
@@ -241,12 +258,64 @@ spec:
             - forProvider
             type: object
           status:
-            description: A MyTypeStatus represents the observed state of a MyType.
+            description: A CentralInstanceStatus represents the observed state of
+              a CentralInstance.
             properties:
               atProvider:
-                description: MyTypeObservation are the observable fields of a MyType.
+                description: CentralInstanceObservation are the observable fields
+                  of a CentralInstance.
                 properties:
-                  observableField:
+                  centralDataURL:
+                    description: CentralDataURL represents Central's data URL.
+                    type: string
+                  centralUIURL:
+                    description: CentralUIURL represents Central's UI URL.
+                    type: string
+                  cloudProvider:
+                    description: CloudProvider to which Central is deployed.
+                    type: string
+                  createdAt:
+                    description: CreatedAt defines the timestamp at which Central
+                      was created.
+                    format: date-time
+                    type: string
+                  href:
+                    description: HRef represents the API path of Central in the RHACS
+                      fleet manager.
+                    type: string
+                  id:
+                    description: ID represents a unique identifier for Central.
+                    type: string
+                  instanceType:
+                    description: InstanceType defines the purchasing type of Central.
+                    type: string
+                  kind:
+                    description: Kind defines the Central kind.
+                    type: string
+                  multiAZ:
+                    description: MultiAZ defines if Central is deployed to a cluster
+                      with multiple availability zones.
+                    type: boolean
+                  name:
+                    description: Name of the Central instance.
+                    type: string
+                  owner:
+                    description: Owner of the Central instance.
+                    type: string
+                  region:
+                    description: Region defines the geographical region which hosts
+                      Central.
+                    type: string
+                  status:
+                    description: Status defines the status of Central.
+                    type: string
+                  updatedAt:
+                    description: CreatedAt defines the timestamp at which Central
+                      was last updated.
+                    format: date-time
+                    type: string
+                  version:
+                    description: Version represents the Central version.
                     type: string
                 type: object
               conditions:
