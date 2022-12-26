@@ -1,4 +1,6 @@
 # provider-redhat
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fstehessel%2Fprovider-redhat.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fstehessel%2Fprovider-redhat?ref=badge_shield)
+
 
 `provider-redhat` is a minimal [Crossplane](https://crossplane.io/) Provider
 that is meant to be used as a redhat for implementing new Providers. It comes
@@ -33,3 +35,7 @@ guide may also be of use.
 
 [CONTRIBUTING.md]: https://github.com/crossplane/crossplane/blob/master/CONTRIBUTING.md
 [provider-dev]: https://github.com/crossplane/crossplane/blob/master/docs/contributing/provider_development_guide.md
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fstehessel%2Fprovider-redhat.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fstehessel%2Fprovider-redhat?ref=badge_large)
