@@ -18,13 +18,13 @@ package centralinstance
 
 import (
 	"context"
-	"fmt"
+	"net/http"
 
-	"github.com/antihax/optional"
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/connection"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/pkg/event"
+	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/pkg/ratelimiter"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
@@ -187,21 +187,18 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotCentralInstance)
 	}
 
-	search := fmt.Sprintf("name=%s", cr.Spec.ForProvider.Name)
-	centralList, _, err := c.client.GetCentrals(ctx, &public.GetCentralsOpts{Search: optional.NewString(search)})
+	centralResp, resp, err := c.client.GetCentralById(ctx, meta.GetExternalName(cr))
 	if err != nil {
+		if resp != nil && resp.StatusCode == http.StatusNotFound {
+			return managed.ExternalObservation{ResourceExists: false}, nil
+		}
 		return managed.ExternalObservation{}, errors.Wrap(err, errGetFailed)
 	}
-	if centralList.Size == 0 {
-		return managed.ExternalObservation{ResourceExists: false}, nil
-	}
-	centralResp := centralList.Items[0]
 
 	cr.Status.AtProvider = generateObservation(&centralResp)
 	condition := getCondition(cr.Status.AtProvider.Status)
 	cr.SetConditions(condition)
 	upToDate, diff := isUpToDate(cr, &centralResp)
-
 	return managed.ExternalObservation{
 		ResourceExists:   true,
 		ResourceUpToDate: upToDate,
@@ -224,7 +221,10 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		Name:           cr.Spec.ForProvider.Name,
 		Region:         string(cr.Spec.ForProvider.Region),
 	}
-	_, _, err := c.client.CreateCentral(ctx, true, request)
+	centralResp, _, err := c.client.CreateCentral(ctx, true, request)
+	if err == nil {
+		meta.SetExternalName(cr, centralResp.Id)
+	}
 	return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
 }
 
