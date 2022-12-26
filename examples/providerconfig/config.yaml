@@ -2,19 +2,20 @@ apiVersion: v1
 kind: Secret
 metadata:
   namespace: crossplane-system
-  name: example-provider-secret
+  name: redhat-provider-secret
 type: Opaque
-data:
-  # credentials: BASE64ENCODED_PROVIDER_CREDS
+stringData:
+  ocmRefreshToken: eyJ...
 ---
 apiVersion: redhat.crossplane.io/v1alpha1
 kind: ProviderConfig
 metadata:
-  name: example
+  name: redhat
 spec:
   credentials:
     source: Secret
     secretRef:
       namespace: crossplane-system
-      name: example-provider-secret
-      key: credentials
+      name: redhat-provider-secret
+      key: ocmRefreshToken
+  endpoint: https://api.openshift.com

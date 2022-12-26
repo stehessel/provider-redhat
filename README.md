@@ -1,35 +1,45 @@
 # provider-redhat
 
-`provider-redhat` is a minimal [Crossplane](https://crossplane.io/) Provider
-that is meant to be used as a redhat for implementing new Providers. It comes
-with the following features that are meant to be refactored:
+## Overview
 
-- A `ProviderConfig` type that only points to a credentials `Secret`.
-- A `MyType` resource type that serves as an example managed resource.
-- A managed resource controller that reconciles `MyType` objects and simply
-  prints their configuration in its `Observe` method.
+`provider-redhat` is the Crossplane infrastructure provider for the [Red Hat
+Console](https://console.redhat.com). The provider that is built from the source
+code in this repository can be installed into a Crossplane control plane and
+adds the following new functionality:
 
-## Developing
+- Custom Resource Definitions (CRDs) and associated controllers to provision
+  Red Hat cloud resources declaratively.
+- The following services are currently supported:
+  - [Red Hat Advanced Cluster Security Cloud Service](https://console.redhat.com/beta/application-services/acs)
 
-1. Use this repository as a redhat to create a new one.
-1. Run `make submodules` to initialize the "build" Make submodule we use for CI/CD.
-1. Rename the provider by running the follwing command:
-```
-  make provider.prepare provider={PascalProviderName}
-```
-4. Add your new type by running the following command:
-```
-make provider.addtype provider={PascalProviderName} group={group} kind={type}
-```
-5. Replace the *sample* group with your new group in apis/{provider}.go
-5. Replace the *mytype* type with your new type in internal/controller/{provider}.go
-5. Replace the default controller and ProviderConfig implementations with your own
-5. Run `make reviewable` to run code generation, linters, and tests.
-5. Run `make build` to build the provider.
+## Getting Started and Documentation
 
-Refer to Crossplane's [CONTRIBUTING.md] file for more information on how the
-Crossplane community prefers to work. The [Provider Development][provider-dev]
-guide may also be of use.
+For getting started guides, installation, deployment, and administration, see
+our [Documentation](https://crossplane.io/docs).
 
-[CONTRIBUTING.md]: https://github.com/crossplane/crossplane/blob/master/CONTRIBUTING.md
-[provider-dev]: https://github.com/crossplane/crossplane/blob/master/docs/contributing/provider_development_guide.md
+## Contributing
+
+`provider-redhat` is a community driven project and we welcome contributions. See the
+Crossplane [Contributing](https://github.com/crossplane/crossplane/blob/master/CONTRIBUTING.md)
+guidelines to get started.
+
+## Report a Bug
+
+For filing bugs, suggesting improvements, or requesting new features, please
+open an [issue](https://github.com/stehessel/provider-redhat/issues).
+
+## Roadmap
+
+Add support for all of Red Hat's cloud resources.
+
+## Code of Conduct
+
+`provider-redhat` adheres to the same [Code of
+Conduct](https://github.com/crossplane/crossplane/blob/master/CODE_OF_CONDUCT.md)
+as the core Crossplane project.
+
+## Licensing
+
+`provider-redhat` is under the Apache 2.0 license.
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fstehessel%2Fprovider-redhat.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fstehessel%2Fprovider-redhat?ref=badge_large)

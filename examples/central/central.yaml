@@ -1,0 +1,12 @@
+apiVersion: rhacs.redhat.crossplane.io/v1alpha1
+kind: CentralInstance
+metadata:
+  name: stehessel
+spec:
+  forProvider:
+    name: stehessel-2
+    cloudProvider: aws
+    region: us-east-1
+    multiAZ: true
+  providerConfigRef:
+    name: redhat
