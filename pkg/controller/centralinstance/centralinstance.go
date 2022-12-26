@@ -133,8 +133,8 @@ func generateObservation(in *public.CentralRequest) v1alpha1.CentralInstanceObse
 	return v1alpha1.CentralInstanceObservation{
 		CentralDataURL: in.CentralDataURL,
 		CentralUIURL:   in.CentralUIURL,
-		CloudAccountId: in.CloudAccountId,
-		CloudProvider:  in.CloudProvider,
+		CloudAccountID: in.CloudAccountId,
+		CloudProvider:  v1alpha1.CloudProvider(in.CloudProvider),
 		CreatedAt:      metav1.NewTime(in.CreatedAt),
 		FailedReason:   in.FailedReason,
 		HRef:           in.Href,
@@ -144,7 +144,7 @@ func generateObservation(in *public.CentralRequest) v1alpha1.CentralInstanceObse
 		MultiAZ:        in.MultiAz,
 		Name:           in.Name,
 		Owner:          in.Owner,
-		Region:         in.Region,
+		Region:         v1alpha1.Region(in.Region),
 		Status:         in.Status,
 		UpdatedAt:      metav1.NewTime(in.UpdatedAt),
 		Version:        in.Version,
@@ -168,10 +168,10 @@ func getCondition(status string) xpv1.Condition {
 }
 
 func isUpToDate(in *v1alpha1.CentralInstance, observed *public.CentralRequest) (bool, string) {
-	observedParams := &v1alpha1.CentralInstanceParameters{
+	observedParams := v1alpha1.CentralInstanceParameters{
 		Name:          observed.Name,
-		CloudProvider: observed.CloudProvider,
-		Region:        observed.Region,
+		CloudProvider: v1alpha1.CloudProvider(observed.CloudProvider),
+		Region:        v1alpha1.Region(observed.Region),
 		MultiAZ:       observed.MultiAz,
 	}
 	if diff := cmp.Diff(in.Spec.ForProvider, observedParams, cmpopts.EquateEmpty()); diff != "" {
@@ -219,10 +219,10 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 
 	request := public.CentralRequestPayload{
 		CloudAccountId: cr.Spec.ForProvider.CloudAccountID,
-		CloudProvider:  cr.Spec.ForProvider.CloudProvider,
+		CloudProvider:  string(cr.Spec.ForProvider.CloudProvider),
 		MultiAz:        cr.Spec.ForProvider.MultiAZ,
 		Name:           cr.Spec.ForProvider.Name,
-		Region:         cr.Spec.ForProvider.Region,
+		Region:         string(cr.Spec.ForProvider.Region),
 	}
 	_, _, err := c.client.CreateCentral(ctx, true, request)
 	return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
@@ -238,17 +238,8 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalUpdate{}, nil
 	}
 
-	if err := c.Delete(ctx, mg); err != nil {
-		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateFailed)
-	}
-	externalCreation, err := c.Create(ctx, mg)
-	if err != nil {
-		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateFailed)
-	}
-
-	return managed.ExternalUpdate{
-		ConnectionDetails: externalCreation.ConnectionDetails,
-	}, errors.Wrap(err, errUpdateFailed)
+	err := c.Delete(ctx, mg)
+	return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateFailed)
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) error {

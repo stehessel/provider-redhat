@@ -70,6 +70,8 @@ spec:
                     type: string
                   cloudProvider:
                     description: CloudProvider to which Central is deployed.
+                    enum:
+                    - aws
                     type: string
                   multiAZ:
                     default: true
@@ -78,13 +80,15 @@ spec:
                     type: boolean
                   name:
                     description: Name of the Central instance.
+                    pattern: ^[a-z]([-a-z0-9]*[a-z0-9])?$
                     type: string
                   region:
                     description: Region defines the geographical region which hosts
                       Central.
+                    enum:
+                    - us-east-1
                     type: string
                 required:
-                - cloudAccountID
                 - cloudProvider
                 - multiAZ
                 - name
@@ -280,6 +284,8 @@ spec:
                     type: string
                   cloudProvider:
                     description: CloudProvider to which Central is deployed.
+                    enum:
+                    - aws
                     type: string
                   createdAt:
                     description: CreatedAt defines the timestamp at which Central
@@ -316,6 +322,8 @@ spec:
                   region:
                     description: Region defines the geographical region which hosts
                       Central.
+                    enum:
+                    - us-east-1
                     type: string
                   status:
                     description: Status defines the status of Central.

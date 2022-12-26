@@ -25,23 +25,31 @@ import (
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 )
 
+// +kubebuilder:validation:Enum=aws
+type CloudProvider string
+
+// +kubebuilder:validation:Enum=us-east-1
+type Region string
+
 // CentralInstanceParameters are the configurable fields of a CentralInstance.
 type CentralInstanceParameters struct {
 	// CloudAccount to which Central is deployed.
-	CloudAccountID string `json:"cloudAccountID"`
+	// +kubebuilder:validation:Optional
+	CloudAccountID string `json:"cloudAccountID,omitempty"`
 
 	// CloudProvider to which Central is deployed.
-	CloudProvider string `json:"cloudProvider"`
+	CloudProvider CloudProvider `json:"cloudProvider"`
 
 	// MultiAZ defines if Central is deployed to a cluster with multiple availability zones.
 	// +kubebuilder:default=true
 	MultiAZ bool `json:"multiAZ"`
 
 	// Name of the Central instance.
+	// +kubebuilder:validation:Pattern=^[a-z]([-a-z0-9]*[a-z0-9])?$
 	Name string `json:"name"`
 
 	// Region defines the geographical region which hosts Central.
-	Region string `json:"region"`
+	Region Region `json:"region"`
 }
 
 // CentralInstanceObservation are the observable fields of a CentralInstance.
@@ -56,7 +64,7 @@ type CentralInstanceObservation struct {
 	CloudAccountID string `json:"cloudAccountID,omitempty"`
 
 	// CloudProvider to which Central is deployed.
-	CloudProvider string `json:"cloudProvider,omitempty"`
+	CloudProvider CloudProvider `json:"cloudProvider,omitempty"`
 
 	// CreatedAt defines the timestamp at which Central was created.
 	CreatedAt metav1.Time `json:"createdAt,omitempty"`
@@ -86,7 +94,7 @@ type CentralInstanceObservation struct {
 	Owner string `json:"owner,omitempty"`
 
 	// Region defines the geographical region which hosts Central.
-	Region string `json:"region,omitempty"`
+	Region Region `json:"region,omitempty"`
 
 	// Status defines the status of Central.
 	Status string `json:"status,omitempty"`
