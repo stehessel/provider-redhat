@@ -19,13 +19,15 @@ package centralinstance
 import (
 	"context"
 	"fmt"
-	"net/http"
 
+	"github.com/antihax/optional"
 	"github.com/pkg/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/connection"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
 	"github.com/crossplane/crossplane-runtime/pkg/event"
@@ -46,9 +48,11 @@ const (
 	errTrackPCUsage       = "cannot track ProviderConfig usage"
 	errGetPC              = "cannot get ProviderConfig"
 	errGetCreds           = "cannot get credentials"
-	errGetInstance        = "cannot get central instance"
 	errNewClient          = "cannot create rhacs client"
-	errNewInstance        = "cannot create central instance"
+	errGetFailed          = "cannot get central instance"
+	errCreateFailed       = "cannot create central instance"
+	errUpdateFailed       = "cannot update central instance"
+	errDeleteFailed       = "cannot delete central instance"
 )
 
 // Setup adds a controller that reconciles CentralInstance managed resources.
@@ -130,17 +134,45 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 		return managed.ExternalObservation{}, errors.New(errNotCentralInstance)
 	}
 
-	if cr.Status.AtProvider.ID == "" {
-		return managed.ExternalObservation{}, nil
-	}
-
-	central, resp, err := c.client.GetCentralById(ctx, cr.Status.AtProvider.ID)
-	fmt.Printf("\n\nObserve: %+v, central: %+v, resp: %+v, err: %+v\n\n", cr, central, resp, err)
+	search := fmt.Sprintf("name=%s", cr.Spec.ForProvider.Name)
+	centralList, _, err := c.client.GetCentrals(ctx, &public.GetCentralsOpts{Search: optional.NewString(search)})
 	if err != nil {
-		if resp != nil && resp.StatusCode == http.StatusNotFound {
-			return managed.ExternalObservation{}, nil
-		}
-		return managed.ExternalObservation{}, errors.Wrap(err, errGetInstance)
+		return managed.ExternalObservation{}, errors.Wrap(err, errGetFailed)
+	}
+	if centralList.Size == 0 {
+		return managed.ExternalObservation{ResourceExists: false}, nil
+	}
+	central := centralList.Items[0]
+
+	cr.Status.AtProvider.CentralDataURL = central.CentralDataURL
+	cr.Status.AtProvider.CentralUIURL = central.CentralUIURL
+	cr.Status.AtProvider.CreatedAt = metav1.NewTime(central.CreatedAt)
+	cr.Status.AtProvider.HRef = central.Href
+	cr.Status.AtProvider.ID = central.Id
+	cr.Status.AtProvider.InstanceType = central.InstanceType
+	cr.Status.AtProvider.Kind = central.Kind
+	cr.Status.AtProvider.MultiAZ = central.MultiAz
+	cr.Status.AtProvider.Name = central.Name
+	cr.Status.AtProvider.Owner = central.Owner
+	cr.Status.AtProvider.Region = central.Region
+	cr.Status.AtProvider.Status = central.Status
+	cr.Status.AtProvider.UpdatedAt = metav1.NewTime(central.UpdatedAt)
+	cr.Status.AtProvider.Version = central.Version
+
+	switch cr.Status.AtProvider.Status {
+	case rhacs.CentralRequestStatusAccepted,
+		rhacs.CentralRequestStatusPreparing,
+		rhacs.CentralRequestStatusProvisioning:
+		cr.SetConditions(xpv1.Creating())
+	case rhacs.CentralRequestStatusReady:
+		cr.SetConditions(xpv1.Available())
+	case rhacs.CentralRequestStatusDeprovision,
+		rhacs.CentralRequestStatusDeleting:
+		cr.SetConditions(xpv1.Deleting())
+	case rhacs.CentralRequestStatusFailed:
+		cr.SetConditions(xpv1.Unavailable())
+	default:
+		cr.SetConditions(xpv1.Unavailable())
 	}
 
 	upToDate := false
@@ -160,20 +192,21 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		return managed.ExternalCreation{}, errors.New(errNotCentralInstance)
 	}
 
+	cr.SetConditions(xpv1.Creating())
+
 	request := public.CentralRequestPayload{
 		CloudProvider: cr.Spec.ForProvider.CloudProvider,
 		MultiAz:       cr.Spec.ForProvider.MultiAZ,
 		Name:          cr.Spec.ForProvider.Name,
 		Region:        cr.Spec.ForProvider.Region,
 	}
-	if _, _, err := c.client.CreateCentral(ctx, true, request); err != nil {
-		return managed.ExternalCreation{}, errors.Wrap(err, errNewInstance)
+	central, _, err := c.client.CreateCentral(ctx, true, request)
+	if err != nil {
+		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
 	}
 
 	return managed.ExternalCreation{
-		// Optionally return any details that may be required to connect to the
-		// external resource. These will be stored as the connection secret.
-		ConnectionDetails: managed.ConnectionDetails{},
+		ConnectionDetails: managed.ConnectionDetails{"id": []byte(central.Id)},
 	}, nil
 }
 
@@ -182,14 +215,22 @@ func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !ok {
 		return managed.ExternalUpdate{}, errors.New(errNotCentralInstance)
 	}
+	if cr.GetCondition(xpv1.TypeReady) == xpv1.Creating() ||
+		cr.GetCondition(xpv1.TypeReady) == xpv1.Deleting() {
+		return managed.ExternalUpdate{}, nil
+	}
 
-	fmt.Printf("Updating: %+v", cr)
+	if err := c.Delete(ctx, mg); err != nil {
+		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateFailed)
+	}
+	externalCreation, err := c.Create(ctx, mg)
+	if err != nil {
+		return managed.ExternalUpdate{}, errors.Wrap(err, errUpdateFailed)
+	}
 
 	return managed.ExternalUpdate{
-		// Optionally return any details that may be required to connect to the
-		// external resource. These will be stored as the connection secret.
-		ConnectionDetails: managed.ConnectionDetails{},
-	}, nil
+		ConnectionDetails: externalCreation.ConnectionDetails,
+	}, errors.Wrap(err, errUpdateFailed)
 }
 
 func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
@@ -198,7 +239,6 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 		return errors.New(errNotCentralInstance)
 	}
 
-	fmt.Printf("Deleting: %+v", cr)
-
-	return nil
+	_, err := c.client.DeleteCentralById(ctx, cr.Status.AtProvider.ID, true)
+	return errors.Wrap(err, errDeleteFailed)
 }

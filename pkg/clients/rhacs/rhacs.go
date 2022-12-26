@@ -5,6 +5,16 @@ import (
 	"github.com/stackrox/acs-fleet-manager/pkg/client/fleetmanager"
 )
 
+const (
+	CentralRequestStatusAccepted     string = "accepted"
+	CentralRequestStatusPreparing    string = "preparing"
+	CentralRequestStatusProvisioning string = "provisioning"
+	CentralRequestStatusReady        string = "ready"
+	CentralRequestStatusFailed       string = "failed"
+	CentralRequestStatusDeprovision  string = "deprovision"
+	CentralRequestStatusDeleting     string = "deleting"
+)
+
 // New creates a new fleet manager client.
 func New(token string, endpoint string) (fleetmanager.PublicAPI, error) {
 	auth, err := fleetmanager.NewOCMAuth(fleetmanager.OCMOption{RefreshToken: token})
