@@ -21,12 +21,6 @@ import (
 	"fmt"
 
 	"github.com/antihax/optional"
-	"github.com/pkg/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/connection"
 	"github.com/crossplane/crossplane-runtime/pkg/controller"
@@ -34,8 +28,15 @@ import (
 	"github.com/crossplane/crossplane-runtime/pkg/ratelimiter"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
+	"github.com/pkg/errors"
 	"github.com/stackrox/acs-fleet-manager/pkg/api/public"
 	"github.com/stackrox/acs-fleet-manager/pkg/client/fleetmanager"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/stehessel/provider-redhat/apis/rhacs/v1alpha1"
 	apisv1alpha1 "github.com/stehessel/provider-redhat/apis/v1alpha1"
@@ -128,6 +129,58 @@ type external struct {
 	client fleetmanager.PublicAPI
 }
 
+func generateObservation(in *public.CentralRequest) v1alpha1.CentralInstanceObservation {
+	return v1alpha1.CentralInstanceObservation{
+		CentralDataURL: in.CentralDataURL,
+		CentralUIURL:   in.CentralUIURL,
+		CloudAccountId: in.CloudAccountId,
+		CloudProvider:  in.CloudProvider,
+		CreatedAt:      metav1.NewTime(in.CreatedAt),
+		FailedReason:   in.FailedReason,
+		HRef:           in.Href,
+		ID:             in.Id,
+		InstanceType:   in.InstanceType,
+		Kind:           in.Kind,
+		MultiAZ:        in.MultiAz,
+		Name:           in.Name,
+		Owner:          in.Owner,
+		Region:         in.Region,
+		Status:         in.Status,
+		UpdatedAt:      metav1.NewTime(in.UpdatedAt),
+		Version:        in.Version,
+	}
+}
+
+func getCondition(status string) xpv1.Condition {
+	switch status {
+	case rhacs.CentralRequestStatusAccepted,
+		rhacs.CentralRequestStatusPreparing,
+		rhacs.CentralRequestStatusProvisioning:
+		return xpv1.Creating()
+	case rhacs.CentralRequestStatusReady:
+		return xpv1.Available()
+	case rhacs.CentralRequestStatusDeprovision,
+		rhacs.CentralRequestStatusDeleting:
+		return xpv1.Deleting()
+	default:
+		return xpv1.Unavailable()
+	}
+}
+
+func isUpToDate(in *v1alpha1.CentralInstance, observed *public.CentralRequest) (bool, string) {
+	observedParams := &v1alpha1.CentralInstanceParameters{
+		Name:          observed.Name,
+		CloudProvider: observed.CloudProvider,
+		Region:        observed.Region,
+		MultiAZ:       observed.MultiAz,
+	}
+	if diff := cmp.Diff(in.Spec.ForProvider, observedParams, cmpopts.EquateEmpty()); diff != "" {
+		diff = "Observed difference in central instance\n" + diff
+		return false, diff
+	}
+	return true, ""
+}
+
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha1.CentralInstance)
 	if !ok {
@@ -142,47 +195,17 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	if centralList.Size == 0 {
 		return managed.ExternalObservation{ResourceExists: false}, nil
 	}
-	central := centralList.Items[0]
+	centralResp := centralList.Items[0]
 
-	cr.Status.AtProvider.CentralDataURL = central.CentralDataURL
-	cr.Status.AtProvider.CentralUIURL = central.CentralUIURL
-	cr.Status.AtProvider.CreatedAt = metav1.NewTime(central.CreatedAt)
-	cr.Status.AtProvider.HRef = central.Href
-	cr.Status.AtProvider.ID = central.Id
-	cr.Status.AtProvider.InstanceType = central.InstanceType
-	cr.Status.AtProvider.Kind = central.Kind
-	cr.Status.AtProvider.MultiAZ = central.MultiAz
-	cr.Status.AtProvider.Name = central.Name
-	cr.Status.AtProvider.Owner = central.Owner
-	cr.Status.AtProvider.Region = central.Region
-	cr.Status.AtProvider.Status = central.Status
-	cr.Status.AtProvider.UpdatedAt = metav1.NewTime(central.UpdatedAt)
-	cr.Status.AtProvider.Version = central.Version
-
-	switch cr.Status.AtProvider.Status {
-	case rhacs.CentralRequestStatusAccepted,
-		rhacs.CentralRequestStatusPreparing,
-		rhacs.CentralRequestStatusProvisioning:
-		cr.SetConditions(xpv1.Creating())
-	case rhacs.CentralRequestStatusReady:
-		cr.SetConditions(xpv1.Available())
-	case rhacs.CentralRequestStatusDeprovision,
-		rhacs.CentralRequestStatusDeleting:
-		cr.SetConditions(xpv1.Deleting())
-	case rhacs.CentralRequestStatusFailed:
-		cr.SetConditions(xpv1.Unavailable())
-	default:
-		cr.SetConditions(xpv1.Unavailable())
-	}
-
-	upToDate := false
-	if central.Name == cr.Spec.ForProvider.Name {
-		upToDate = true
-	}
+	cr.Status.AtProvider = generateObservation(&centralResp)
+	condition := getCondition(cr.Status.AtProvider.Status)
+	cr.SetConditions(condition)
+	upToDate, diff := isUpToDate(cr, &centralResp)
 
 	return managed.ExternalObservation{
 		ResourceExists:   true,
 		ResourceUpToDate: upToDate,
+		Diff:             diff,
 	}, nil
 }
 
@@ -195,19 +218,14 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	cr.SetConditions(xpv1.Creating())
 
 	request := public.CentralRequestPayload{
-		CloudProvider: cr.Spec.ForProvider.CloudProvider,
-		MultiAz:       cr.Spec.ForProvider.MultiAZ,
-		Name:          cr.Spec.ForProvider.Name,
-		Region:        cr.Spec.ForProvider.Region,
+		CloudAccountId: cr.Spec.ForProvider.CloudAccountID,
+		CloudProvider:  cr.Spec.ForProvider.CloudProvider,
+		MultiAz:        cr.Spec.ForProvider.MultiAZ,
+		Name:           cr.Spec.ForProvider.Name,
+		Region:         cr.Spec.ForProvider.Region,
 	}
-	central, _, err := c.client.CreateCentral(ctx, true, request)
-	if err != nil {
-		return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
-	}
-
-	return managed.ExternalCreation{
-		ConnectionDetails: managed.ConnectionDetails{"id": []byte(central.Id)},
-	}, nil
+	_, _, err := c.client.CreateCentral(ctx, true, request)
+	return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
 }
 
 func (c *external) Update(ctx context.Context, mg resource.Managed) (managed.ExternalUpdate, error) {

@@ -27,18 +27,21 @@ import (
 
 // CentralInstanceParameters are the configurable fields of a CentralInstance.
 type CentralInstanceParameters struct {
-	// Name of the Central instance.
-	Name string `json:"name"`
+	// CloudAccount to which Central is deployed.
+	CloudAccountID string `json:"cloudAccountID"`
 
 	// CloudProvider to which Central is deployed.
 	CloudProvider string `json:"cloudProvider"`
 
-	// Region defines the geographical region which hosts Central.
-	Region string `json:"region"`
-
 	// MultiAZ defines if Central is deployed to a cluster with multiple availability zones.
 	// +kubebuilder:default=true
 	MultiAZ bool `json:"multiAZ"`
+
+	// Name of the Central instance.
+	Name string `json:"name"`
+
+	// Region defines the geographical region which hosts Central.
+	Region string `json:"region"`
 }
 
 // CentralInstanceObservation are the observable fields of a CentralInstance.
@@ -49,11 +52,17 @@ type CentralInstanceObservation struct {
 	// CentralUIURL represents Central's UI URL.
 	CentralUIURL string `json:"centralUIURL,omitempty"`
 
+	// CloudAccountID against which the instance is billed.
+	CloudAccountID string `json:"cloudAccountID,omitempty"`
+
 	// CloudProvider to which Central is deployed.
 	CloudProvider string `json:"cloudProvider,omitempty"`
 
 	// CreatedAt defines the timestamp at which Central was created.
 	CreatedAt metav1.Time `json:"createdAt,omitempty"`
+
+	// FailedReason indicates why the instance is in a failed state.
+	FailedReason string `json:"failedReason,omitempty"`
 
 	// HRef represents the API path of Central in the RHACS fleet manager.
 	HRef string `json:"href,omitempty"`

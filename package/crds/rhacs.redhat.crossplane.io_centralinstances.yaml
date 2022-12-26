@@ -65,6 +65,9 @@ spec:
                 description: CentralInstanceParameters are the configurable fields
                   of a CentralInstance.
                 properties:
+                  cloudAccountID:
+                    description: CloudAccount to which Central is deployed.
+                    type: string
                   cloudProvider:
                     description: CloudProvider to which Central is deployed.
                     type: string
@@ -81,6 +84,7 @@ spec:
                       Central.
                     type: string
                 required:
+                - cloudAccountID
                 - cloudProvider
                 - multiAZ
                 - name
@@ -271,6 +275,9 @@ spec:
                   centralUIURL:
                     description: CentralUIURL represents Central's UI URL.
                     type: string
+                  cloudAccountID:
+                    description: CloudAccountID against which the instance is billed.
+                    type: string
                   cloudProvider:
                     description: CloudProvider to which Central is deployed.
                     type: string
@@ -278,6 +285,10 @@ spec:
                     description: CreatedAt defines the timestamp at which Central
                       was created.
                     format: date-time
+                    type: string
+                  failedReason:
+                    description: FailedReason indicates why the instance is in a failed
+                      state.
                     type: string
                   href:
                     description: HRef represents the API path of Central in the RHACS
