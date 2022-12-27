@@ -3,7 +3,6 @@ module github.com/stehessel/provider-redhat
 go 1.19
 
 require (
-	github.com/antihax/optional v1.0.0
 	github.com/crossplane/crossplane-runtime v0.18.0
 	github.com/crossplane/crossplane-tools v0.0.0-20220901191540-806c0b01097b
 	github.com/google/go-cmp v0.5.9
@@ -19,6 +18,7 @@ require (
 require (
 	github.com/alecthomas/template v0.0.0-20190718012654-fb15b899a751 // indirect
 	github.com/alecthomas/units v0.0.0-20210912230133-d1bdfacee922 // indirect
+	github.com/antihax/optional v1.0.0 // indirect
 	github.com/armon/go-metrics v0.3.9 // indirect
 	github.com/armon/go-radix v1.0.0 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
