@@ -1,5 +1,9 @@
 # provider-redhat
 
+## Work-in-progress
+
+At this point `provider-redhat` is only a proof of concept and not recommended for productive use.
+
 ## Overview
 
 `provider-redhat` is the Crossplane infrastructure provider for the [Red Hat

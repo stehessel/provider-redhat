@@ -7,7 +7,8 @@ metadata:
     meta.crossplane.io/source: github.com/stehessel/provider-redhat
     meta.crossplane.io/license: Apache-2.0
     meta.crossplane.io/description: |
-      A redhat that can be used to create Crossplane providers.
+      The Red Hat Crossplane provider adds support for managing Red Hat cloud
+      resources in Kubernetes.
 
 spec:
   controller:
