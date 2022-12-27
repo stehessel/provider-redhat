@@ -30,11 +30,13 @@ import (
 	"github.com/stackrox/acs-fleet-manager/pkg/client/fleetmanager"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 	"github.com/crossplane/crossplane-runtime/pkg/meta"
 	"github.com/crossplane/crossplane-runtime/pkg/reconciler/managed"
 	"github.com/crossplane/crossplane-runtime/pkg/resource"
 
 	"github.com/stehessel/provider-redhat/apis/rhacs/v1alpha1"
+	"github.com/stehessel/provider-redhat/pkg/clients/rhacs"
 )
 
 // Test that our Reconciler implementation satisfies the Reconciler interface.
@@ -48,35 +50,29 @@ var (
 	multiAZ        = true
 	name           = "test-central"
 	region         = v1alpha1.Region("us-east-1")
+	id             = "test-id"
 	centralRequest = public.CentralRequest{
-		Id:            "test-id",
+		Id:            id,
 		CloudProvider: string(cloudProvider),
 		MultiAz:       multiAZ,
 		Name:          name,
 		Region:        string(region),
+		Status:        rhacs.CentralRequestStatusReady,
 	}
 )
 
 type centralInstanceModifier func(*v1alpha1.CentralInstance)
 
-func withCloudAccountID(id string) centralInstanceModifier {
-	return func(c *v1alpha1.CentralInstance) { c.Spec.ForProvider.CloudAccountID = id }
-}
-
-func withCloudProvider(provider v1alpha1.CloudProvider) centralInstanceModifier {
-	return func(c *v1alpha1.CentralInstance) { c.Spec.ForProvider.CloudProvider = provider }
+func withConditions(c ...xpv1.Condition) centralInstanceModifier {
+	return func(r *v1alpha1.CentralInstance) { r.Status.ConditionedStatus.Conditions = c }
 }
 
 func withName(name string) centralInstanceModifier {
-	return func(c *v1alpha1.CentralInstance) { c.Spec.ForProvider.Name = name }
+	return func(c *v1alpha1.CentralInstance) { c.Status.AtProvider.Name = name }
 }
 
-func withMultiAZ(multi bool) centralInstanceModifier {
-	return func(c *v1alpha1.CentralInstance) { c.Spec.ForProvider.MultiAZ = multi }
-}
-
-func withRegion(region v1alpha1.Region) centralInstanceModifier {
-	return func(c *v1alpha1.CentralInstance) { c.Spec.ForProvider.Region = region }
+func withStatus(status string) centralInstanceModifier {
+	return func(c *v1alpha1.CentralInstance) { c.Status.AtProvider.Status = status }
 }
 
 func centralInstance(mod ...centralInstanceModifier) *v1alpha1.CentralInstance {
@@ -88,6 +84,16 @@ func centralInstance(mod ...centralInstanceModifier) *v1alpha1.CentralInstance {
 				MultiAZ:       multiAZ,
 				Name:          name,
 				Region:        region,
+			},
+		},
+		Status: v1alpha1.CentralInstanceStatus{
+			AtProvider: v1alpha1.CentralInstanceObservation{
+				CloudProvider: cloudProvider,
+				ID:            id,
+				MultiAZ:       multiAZ,
+				Name:          name,
+				Region:        region,
+				Status:        rhacs.CentralRequestStatusReady,
 			},
 		},
 	}
@@ -114,7 +120,8 @@ func TestObserve(t *testing.T) {
 	}
 
 	type want struct {
-		o   managed.ExternalObservation
+		obs managed.ExternalObservation
+		mg  resource.Managed
 		err error
 	}
 
@@ -125,20 +132,24 @@ func TestObserve(t *testing.T) {
 		want   want
 	}{
 		{
-			name: "Observation no diff",
+			name: "observation no diff",
 			client: &fleetmanager.PublicAPIMock{
 				GetCentralByIdFunc: func(ctx context.Context, id string) (public.CentralRequest, *http.Response, error) {
 					return centralRequest, nil, nil
 				},
 			},
-			args: args{ctx: context.Background(), mg: centralInstance()},
-			want: want{o: managed.ExternalObservation{
-				ResourceExists:   true,
-				ResourceUpToDate: true,
-			}, err: nil},
+			args: args{ctx: context.Background(), mg: centralInstance(withConditions(xpv1.Available()))},
+			want: want{
+				obs: managed.ExternalObservation{
+					ResourceExists:   true,
+					ResourceUpToDate: true,
+				},
+				mg:  centralInstance(withConditions(xpv1.Available())),
+				err: nil,
+			},
 		},
 		{
-			name: "Observation diff",
+			name: "observation diff",
 			client: &fleetmanager.PublicAPIMock{
 				GetCentralByIdFunc: func(ctx context.Context, id string) (public.CentralRequest, *http.Response, error) {
 					c := centralRequest
@@ -146,31 +157,109 @@ func TestObserve(t *testing.T) {
 					return c, nil, nil
 				},
 			},
-			args: args{ctx: context.Background(), mg: centralInstance()},
-			want: want{o: managed.ExternalObservation{
-				ResourceExists:   true,
-				ResourceUpToDate: false,
-			}, err: nil},
+			args: args{ctx: context.Background(), mg: centralInstance(withConditions(xpv1.Available()))},
+			want: want{
+				obs: managed.ExternalObservation{
+					ResourceExists:   true,
+					ResourceUpToDate: false,
+				},
+				mg:  centralInstance(withName("new-name"), withConditions(xpv1.Available())),
+				err: nil,
+			},
 		},
 		{
-			name: "Observation no Central found",
+			name: "observation while creating",
+			client: &fleetmanager.PublicAPIMock{
+				GetCentralByIdFunc: func(ctx context.Context, id string) (public.CentralRequest, *http.Response, error) {
+					c := centralRequest
+					c.Status = rhacs.CentralRequestStatusAccepted
+					return c, nil, nil
+				},
+			},
+			args: args{
+				ctx: context.Background(),
+				mg:  centralInstance(withConditions(xpv1.Creating()), withStatus(rhacs.CentralRequestStatusAccepted)),
+			},
+			want: want{
+				obs: managed.ExternalObservation{
+					ResourceExists:   true,
+					ResourceUpToDate: true,
+				},
+				mg:  centralInstance(withConditions(xpv1.Creating()), withStatus(rhacs.CentralRequestStatusAccepted)),
+				err: nil,
+			},
+		},
+		{
+			name: "observation while available",
+			client: &fleetmanager.PublicAPIMock{
+				GetCentralByIdFunc: func(ctx context.Context, id string) (public.CentralRequest, *http.Response, error) {
+					c := centralRequest
+					c.Status = rhacs.CentralRequestStatusReady
+					return c, nil, nil
+				},
+			},
+			args: args{
+				ctx: context.Background(),
+				mg:  centralInstance(withConditions(xpv1.Creating()), withStatus(rhacs.CentralRequestStatusAccepted)),
+			},
+			want: want{
+				obs: managed.ExternalObservation{
+					ResourceExists:   true,
+					ResourceUpToDate: true,
+				},
+				mg:  centralInstance(withConditions(xpv1.Available())),
+				err: nil,
+			},
+		},
+		{
+			name: "observation while deleting",
+			client: &fleetmanager.PublicAPIMock{
+				GetCentralByIdFunc: func(ctx context.Context, id string) (public.CentralRequest, *http.Response, error) {
+					c := centralRequest
+					c.Status = rhacs.CentralRequestStatusDeleting
+					return c, nil, nil
+				},
+			},
+			args: args{
+				ctx: context.Background(),
+				mg:  centralInstance(withConditions(xpv1.Creating()), withStatus(rhacs.CentralRequestStatusAccepted)),
+			},
+			want: want{
+				obs: managed.ExternalObservation{
+					ResourceExists:   true,
+					ResourceUpToDate: true,
+				},
+				mg:  centralInstance(withConditions(xpv1.Deleting()), withStatus(rhacs.CentralRequestStatusDeleting)),
+				err: nil,
+			},
+		},
+		{
+			name: "observation no central found",
 			client: &fleetmanager.PublicAPIMock{
 				GetCentralByIdFunc: func(ctx context.Context, id string) (public.CentralRequest, *http.Response, error) {
 					return public.CentralRequest{}, makeHTTPResponse(http.StatusNotFound), errors.New(errGetFailed)
 				},
 			},
 			args: args{ctx: context.Background(), mg: centralInstance()},
-			want: want{o: managed.ExternalObservation{}, err: nil},
+			want: want{
+				obs: managed.ExternalObservation{},
+				mg:  centralInstance(),
+				err: nil,
+			},
 		},
 		{
-			name: "Observation error",
+			name: "observation error during get",
 			client: &fleetmanager.PublicAPIMock{
 				GetCentralByIdFunc: func(ctx context.Context, id string) (public.CentralRequest, *http.Response, error) {
 					return public.CentralRequest{}, nil, errors.New(errGetFailed)
 				},
 			},
 			args: args{ctx: context.Background(), mg: centralInstance()},
-			want: want{o: managed.ExternalObservation{}, err: cmpopts.AnyError},
+			want: want{
+				obs: managed.ExternalObservation{},
+				mg:  centralInstance(),
+				err: cmpopts.AnyError,
+			},
 		},
 	}
 
@@ -181,8 +270,11 @@ func TestObserve(t *testing.T) {
 			if diff := cmp.Diff(tc.want.err, err, cmpopts.EquateErrors()); diff != "" {
 				t.Errorf("\ne.Observe(...): -want error, +got error:\n%s\n", diff)
 			}
-			if diff := cmp.Diff(tc.want.o, got,
+			if diff := cmp.Diff(tc.want.obs, got,
 				cmpopts.IgnoreFields(managed.ExternalObservation{}, "Diff")); diff != "" {
+				t.Errorf("\ne.Observe(...): -want, +got:\n%s\n", diff)
+			}
+			if diff := cmp.Diff(tc.want.mg, tc.args.mg); diff != "" {
 				t.Errorf("\ne.Observe(...): -want, +got:\n%s\n", diff)
 			}
 		})
