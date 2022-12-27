@@ -25,9 +25,11 @@ import (
 	xpv1 "github.com/crossplane/crossplane-runtime/apis/common/v1"
 )
 
+// CloudProvider is a typed enum for the cloud provider.
 // +kubebuilder:validation:Enum=aws
 type CloudProvider string
 
+// Region is a typed enum for the region.
 // +kubebuilder:validation:Enum=us-east-1
 type Region string
 

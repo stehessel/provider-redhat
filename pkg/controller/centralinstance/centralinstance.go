@@ -189,6 +189,9 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	}
 
 	centralResp, resp, err := c.client.GetCentralById(ctx, meta.GetExternalName(cr))
+	if resp != nil {
+		defer resp.Body.Close()
+	}
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			return managed.ExternalObservation{ResourceExists: false}, nil
@@ -222,7 +225,10 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		Name:           cr.Spec.ForProvider.Name,
 		Region:         string(cr.Spec.ForProvider.Region),
 	}
-	centralResp, _, err := c.client.CreateCentral(ctx, true, request)
+	centralResp, resp, err := c.client.CreateCentral(ctx, true, request)
+	if resp != nil {
+		defer resp.Body.Close()
+	}
 	if err == nil {
 		meta.SetExternalName(cr, centralResp.Id)
 	}
@@ -249,6 +255,9 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 		return errors.New(errNotCentralInstance)
 	}
 
-	_, err := c.client.DeleteCentralById(ctx, cr.Status.AtProvider.ID, true)
+	resp, err := c.client.DeleteCentralById(ctx, cr.Status.AtProvider.ID, true)
+	if resp != nil {
+		defer resp.Body.Close()
+	}
 	return errors.Wrap(err, errDeleteFailed)
 }

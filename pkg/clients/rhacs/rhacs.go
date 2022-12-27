@@ -5,6 +5,7 @@ import (
 	"github.com/stackrox/acs-fleet-manager/pkg/client/fleetmanager"
 )
 
+// Central request states in fleet manager.
 const (
 	CentralRequestStatusAccepted     string = "accepted"
 	CentralRequestStatusPreparing    string = "preparing"
