@@ -46,22 +46,25 @@ var (
 )
 
 var (
-	cloudProvider  = v1alpha1.CloudProvider("aws")
-	multiAZ        = true
-	name           = "test-central"
-	region         = v1alpha1.Region("us-east-1")
-	id             = "test-id"
-	centralRequest = public.CentralRequest{
-		Id:            id,
-		CloudProvider: string(cloudProvider),
-		MultiAz:       multiAZ,
-		Name:          name,
-		Region:        string(region),
-		Status:        rhacs.CentralRequestStatusReady,
-	}
+	cloudProvider = v1alpha1.CloudProvider("aws")
+	multiAZ       = true
+	name          = "test-central"
+	region        = v1alpha1.Region("us-east-1")
+	id            = "test-id"
 )
 
-type centralInstanceModifier func(*v1alpha1.CentralInstance)
+type (
+	centralRequestModifier  func(*public.CentralRequest)
+	centralInstanceModifier func(*v1alpha1.CentralInstance)
+)
+
+func withRequestName(name string) centralRequestModifier {
+	return func(c *public.CentralRequest) { c.Name = name }
+}
+
+func withRequestStatus(status string) centralRequestModifier {
+	return func(c *public.CentralRequest) { c.Status = status }
+}
 
 func withConditions(c ...xpv1.Condition) centralInstanceModifier {
 	return func(r *v1alpha1.CentralInstance) { r.Status.ConditionedStatus.Conditions = c }
@@ -73,6 +76,21 @@ func withName(name string) centralInstanceModifier {
 
 func withStatus(status string) centralInstanceModifier {
 	return func(c *v1alpha1.CentralInstance) { c.Status.AtProvider.Status = status }
+}
+
+func centralRequest(mod ...centralRequestModifier) public.CentralRequest {
+	c := public.CentralRequest{
+		Id:            id,
+		CloudProvider: string(cloudProvider),
+		MultiAz:       multiAZ,
+		Name:          name,
+		Region:        string(region),
+		Status:        rhacs.CentralRequestStatusReady,
+	}
+	for _, m := range mod {
+		m(&c)
+	}
+	return c
 }
 
 func centralInstance(mod ...centralInstanceModifier) *v1alpha1.CentralInstance {
@@ -135,7 +153,7 @@ func TestObserve(t *testing.T) {
 			name: "observation no diff",
 			client: &fleetmanager.PublicAPIMock{
 				GetCentralByIdFunc: func(ctx context.Context, id string) (public.CentralRequest, *http.Response, error) {
-					return centralRequest, nil, nil
+					return centralRequest(), nil, nil
 				},
 			},
 			args: args{ctx: context.Background(), mg: centralInstance(withConditions(xpv1.Available()))},
@@ -152,9 +170,7 @@ func TestObserve(t *testing.T) {
 			name: "observation diff",
 			client: &fleetmanager.PublicAPIMock{
 				GetCentralByIdFunc: func(ctx context.Context, id string) (public.CentralRequest, *http.Response, error) {
-					c := centralRequest
-					c.Name = "new-name"
-					return c, nil, nil
+					return centralRequest(withRequestName("new-name")), nil, nil
 				},
 			},
 			args: args{ctx: context.Background(), mg: centralInstance(withConditions(xpv1.Available()))},
@@ -171,9 +187,7 @@ func TestObserve(t *testing.T) {
 			name: "observation while creating",
 			client: &fleetmanager.PublicAPIMock{
 				GetCentralByIdFunc: func(ctx context.Context, id string) (public.CentralRequest, *http.Response, error) {
-					c := centralRequest
-					c.Status = rhacs.CentralRequestStatusAccepted
-					return c, nil, nil
+					return centralRequest(withRequestStatus(rhacs.CentralRequestStatusAccepted)), nil, nil
 				},
 			},
 			args: args{
@@ -193,9 +207,7 @@ func TestObserve(t *testing.T) {
 			name: "observation while available",
 			client: &fleetmanager.PublicAPIMock{
 				GetCentralByIdFunc: func(ctx context.Context, id string) (public.CentralRequest, *http.Response, error) {
-					c := centralRequest
-					c.Status = rhacs.CentralRequestStatusReady
-					return c, nil, nil
+					return centralRequest(withRequestStatus(rhacs.CentralRequestStatusReady)), nil, nil
 				},
 			},
 			args: args{
@@ -215,9 +227,7 @@ func TestObserve(t *testing.T) {
 			name: "observation while deleting",
 			client: &fleetmanager.PublicAPIMock{
 				GetCentralByIdFunc: func(ctx context.Context, id string) (public.CentralRequest, *http.Response, error) {
-					c := centralRequest
-					c.Status = rhacs.CentralRequestStatusDeleting
-					return c, nil, nil
+					return centralRequest(withRequestStatus(rhacs.CentralRequestStatusDeleting)), nil, nil
 				},
 			},
 			args: args{
