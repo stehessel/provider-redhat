@@ -377,3 +377,85 @@ func TestCreate(t *testing.T) {
 		})
 	}
 }
+
+func TestDelete(t *testing.T) {
+	type args struct {
+		ctx context.Context
+		mg  resource.Managed
+	}
+
+	type want struct {
+		obs managed.ExternalCreation
+		mg  resource.Managed
+		err error
+	}
+
+	cases := []struct {
+		name   string
+		client fleetmanager.PublicAPI
+		args   args
+		want   want
+	}{
+		{
+			name: "delete success",
+			client: &fleetmanager.PublicAPIMock{
+				DeleteCentralByIdFunc: func(ctx context.Context, id string, async bool) (*http.Response, error) {
+					return nil, nil
+				},
+			},
+			args: args{
+				ctx: context.Background(),
+				mg:  centralInstance(),
+			},
+			want: want{
+				mg:  centralInstance(withConditions(xpv1.Deleting())),
+				err: nil,
+			},
+		},
+		{
+			name: "delete already in progress",
+			client: &fleetmanager.PublicAPIMock{
+				DeleteCentralByIdFunc: func(ctx context.Context, id string, async bool) (*http.Response, error) {
+					return nil, errors.New("should never reach this error")
+				},
+			},
+			args: args{
+				ctx: context.Background(),
+				mg:  centralInstance(withConditions(xpv1.Deleting()), withStatus(rhacs.CentralRequestStatusDeprovision)),
+			},
+			want: want{
+				mg:  centralInstance(withConditions(xpv1.Deleting()), withStatus(rhacs.CentralRequestStatusDeprovision)),
+				err: nil,
+			},
+		},
+		{
+			name: "delete error",
+			client: &fleetmanager.PublicAPIMock{
+				DeleteCentralByIdFunc: func(ctx context.Context, id string, async bool) (*http.Response, error) {
+					return nil, errors.New(errDeleteFailed)
+				},
+			},
+			args: args{
+				ctx: context.Background(),
+				mg:  centralInstance(),
+			},
+			want: want{
+				mg:  centralInstance(withConditions(xpv1.Deleting())),
+				err: cmpopts.AnyError,
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			e := external{client: tc.client}
+			err := e.Delete(tc.args.ctx, tc.args.mg)
+			if diff := cmp.Diff(tc.want.err, err, cmpopts.EquateErrors()); diff != "" {
+				t.Errorf("\ne.Create(...): -want error, +got error:\n%s\n", diff)
+			}
+			if diff := cmp.Diff(tc.want.mg, tc.args.mg); diff != "" {
+				t.Errorf("\ne.Create(...): -want, +got:\n%s\n", diff)
+			}
+		})
+	}
+}
