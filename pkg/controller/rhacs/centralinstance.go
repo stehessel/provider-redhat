@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package centralinstance
+package rhacs
 
 import (
 	"context"
@@ -50,7 +50,6 @@ const (
 	errTrackPCUsage       = "cannot track ProviderConfig usage"
 	errGetPC              = "cannot get ProviderConfig"
 	errGetCreds           = "cannot get credentials"
-	errNewClient          = "cannot create rhacs client"
 	errGetFailed          = "cannot get central instance"
 	errCreateFailed       = "cannot create central instance"
 	errUpdateFailed       = "cannot update central instance"
@@ -111,15 +110,15 @@ func (c *connector) Connect(ctx context.Context, mg resource.Managed) (managed.E
 	}
 
 	cd := pc.Spec.Credentials
-	data, err := resource.CommonCredentialExtractor(ctx, cd.Source, c.kube, cd.CommonCredentialSelectors)
+	token, err := resource.CommonCredentialExtractor(ctx, cd.Source, c.kube, cd.CommonCredentialSelectors)
 	if err != nil {
 		return nil, errors.Wrap(err, errGetCreds)
 	}
-	stringData := string(data)
+	stringToken := string(token)
 
-	client, err := rhacs.New(stringData, pc.Spec.Endpoint)
+	client, err := rhacs.NewClient(stringToken, pc.Spec.Gateway)
 	if err != nil {
-		return nil, errors.Wrap(err, errNewClient)
+		return nil, errors.Wrap(err, rhacs.ErrNewClient)
 	}
 	return &external{client: client}, nil
 }

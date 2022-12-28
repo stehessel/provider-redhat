@@ -30,8 +30,8 @@ type ProviderConfigSpec struct {
 	// Credentials required to authenticate to this provider.
 	Credentials ProviderCredentials `json:"credentials"`
 
-	// Endpoint of the OpenShift API gateway.
-	Endpoint string `json:"endpoint"`
+	// Gateway endpoint of the OpenShift API gateway.
+	Gateway string `json:"gateway"`
 }
 
 // ProviderCredentials required to authenticate.

@@ -16,8 +16,11 @@ const (
 	CentralRequestStatusDeleting     string = "deleting"
 )
 
-// New creates a new fleet manager client.
-func New(token string, endpoint string) (fleetmanager.PublicAPI, error) {
+// ErrNewClient represents an error to create a new fleet-manager client.
+const ErrNewClient = "cannot create rhacs client"
+
+// NewClient creates a new fleet manager client.
+func NewClient(token string, endpoint string) (fleetmanager.PublicAPI, error) {
 	auth, err := fleetmanager.NewOCMAuth(fleetmanager.OCMOption{RefreshToken: token})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create fleet manager authentication")
