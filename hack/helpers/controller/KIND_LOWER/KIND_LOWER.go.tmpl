@@ -34,7 +34,7 @@ import (
 
 	"github.com/crossplane/provider-{{ .Env.PROVIDER | strings.ToLower }}/apis/{{ .Env.GROUP | strings.ToLower }}/{{ .Env.APIVERSION | strings.ToLower }}"
 	apisv1alpha1 "github.com/crossplane/provider-{{ .Env.PROVIDER | strings.ToLower }}/apis/v1alpha1"
-	"github.com/crossplane/provider-{{ .Env.PROVIDER | strings.ToLower }}/internal/controller/features"
+	"github.com/crossplane/provider-{{ .Env.PROVIDER | strings.ToLower }}/pkg/controller/features"
 )
 
 const (

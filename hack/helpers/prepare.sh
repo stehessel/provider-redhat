@@ -22,7 +22,7 @@ ProviderNameUpper=${PROVIDER}
 ProviderNameLower=$(echo "${PROVIDER}" | tr "[:upper:]" "[:lower:]")
 
 git rm -r apis/sample
-git rm -r internal/controller/mytype
+git rm -r pkg/controller/mytype
 
 REPLACE_FILES='./* ./.github :!build/** :!go.* :!hack/**'
 # shellcheck disable=SC2086
@@ -37,6 +37,6 @@ sed -i.bak "s/provider-template/provider-${ProviderNameLower}/g" go.mod
 git clean -fd
 
 git mv "apis/template.go" "apis/${ProviderNameLower}.go"
-git mv "internal/controller/template.go" "internal/controller/${ProviderNameLower}.go"
+git mv "pkg/controller/template.go" "pkg/controller/${ProviderNameLower}.go"
 git mv "cluster/images/provider-template" "cluster/images/provider-${ProviderNameLower}"
 git mv "cluster/images/provider-template-controller" "cluster/images/provider-${ProviderNameLower}-controller"
