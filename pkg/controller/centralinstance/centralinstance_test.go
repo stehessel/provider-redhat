@@ -78,6 +78,10 @@ func withStatus(status string) centralInstanceModifier {
 	return func(c *v1alpha1.CentralInstance) { c.Status.AtProvider.Status = status }
 }
 
+func withExternalName(name string) centralInstanceModifier {
+	return func(c *v1alpha1.CentralInstance) { c.ObjectMeta.Annotations["crossplane.io/external-name"] = name }
+}
+
 func centralRequest(mod ...centralRequestModifier) public.CentralRequest {
 	c := public.CentralRequest{
 		Id:            id,
@@ -156,7 +160,10 @@ func TestObserve(t *testing.T) {
 					return centralRequest(), nil, nil
 				},
 			},
-			args: args{ctx: context.Background(), mg: centralInstance(withConditions(xpv1.Available()))},
+			args: args{
+				ctx: context.Background(),
+				mg:  centralInstance(withConditions(xpv1.Available())),
+			},
 			want: want{
 				obs: managed.ExternalObservation{
 					ResourceExists:   true,
@@ -173,7 +180,10 @@ func TestObserve(t *testing.T) {
 					return centralRequest(withRequestName("new-name")), nil, nil
 				},
 			},
-			args: args{ctx: context.Background(), mg: centralInstance(withConditions(xpv1.Available()))},
+			args: args{
+				ctx: context.Background(),
+				mg:  centralInstance(withConditions(xpv1.Available())),
+			},
 			want: want{
 				obs: managed.ExternalObservation{
 					ResourceExists:   true,
@@ -250,7 +260,10 @@ func TestObserve(t *testing.T) {
 					return public.CentralRequest{}, makeHTTPResponse(http.StatusNotFound), errors.New(errGetFailed)
 				},
 			},
-			args: args{ctx: context.Background(), mg: centralInstance()},
+			args: args{
+				ctx: context.Background(),
+				mg:  centralInstance(),
+			},
 			want: want{
 				obs: managed.ExternalObservation{},
 				mg:  centralInstance(),
@@ -264,7 +277,10 @@ func TestObserve(t *testing.T) {
 					return public.CentralRequest{}, nil, errors.New(errGetFailed)
 				},
 			},
-			args: args{ctx: context.Background(), mg: centralInstance()},
+			args: args{
+				ctx: context.Background(),
+				mg:  centralInstance(),
+			},
 			want: want{
 				obs: managed.ExternalObservation{},
 				mg:  centralInstance(),
@@ -286,6 +302,77 @@ func TestObserve(t *testing.T) {
 			}
 			if diff := cmp.Diff(tc.want.mg, tc.args.mg); diff != "" {
 				t.Errorf("\ne.Observe(...): -want, +got:\n%s\n", diff)
+			}
+		})
+	}
+}
+
+func TestCreate(t *testing.T) {
+	type args struct {
+		ctx context.Context
+		mg  resource.Managed
+	}
+
+	type want struct {
+		obs managed.ExternalCreation
+		mg  resource.Managed
+		err error
+	}
+
+	cases := []struct {
+		name   string
+		client fleetmanager.PublicAPI
+		args   args
+		want   want
+	}{
+		{
+			name: "creation success",
+			client: &fleetmanager.PublicAPIMock{
+				CreateCentralFunc: func(ctx context.Context, async bool, request public.CentralRequestPayload) (public.CentralRequest, *http.Response, error) {
+					return centralRequest(), nil, nil
+				},
+			},
+			args: args{
+				ctx: context.Background(),
+				mg:  centralInstance(),
+			},
+			want: want{
+				obs: managed.ExternalCreation{},
+				mg:  centralInstance(withConditions(xpv1.Creating()), withExternalName(id)),
+				err: nil,
+			},
+		},
+		{
+			name: "creation error",
+			client: &fleetmanager.PublicAPIMock{
+				CreateCentralFunc: func(ctx context.Context, async bool, request public.CentralRequestPayload) (public.CentralRequest, *http.Response, error) {
+					return centralRequest(), nil, errors.New(errCreateFailed)
+				},
+			},
+			args: args{
+				ctx: context.Background(),
+				mg:  centralInstance(),
+			},
+			want: want{
+				obs: managed.ExternalCreation{},
+				mg:  centralInstance(withConditions(xpv1.Creating())),
+				err: cmpopts.AnyError,
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			e := external{client: tc.client}
+			got, err := e.Create(tc.args.ctx, tc.args.mg)
+			if diff := cmp.Diff(tc.want.err, err, cmpopts.EquateErrors()); diff != "" {
+				t.Errorf("\ne.Create(...): -want error, +got error:\n%s\n", diff)
+			}
+			if diff := cmp.Diff(tc.want.obs, got); diff != "" {
+				t.Errorf("\ne.Create(...): -want, +got:\n%s\n", diff)
+			}
+			if diff := cmp.Diff(tc.want.mg, tc.args.mg); diff != "" {
+				t.Errorf("\ne.Create(...): -want, +got:\n%s\n", diff)
 			}
 		})
 	}
