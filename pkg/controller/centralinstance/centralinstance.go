@@ -258,6 +258,11 @@ func (c *external) Delete(ctx context.Context, mg resource.Managed) error {
 	if !ok {
 		return errors.New(errNotCentralInstance)
 	}
+	mg.SetConditions(xpv1.Deleting())
+	if cr.Status.AtProvider.Status == rhacs.CentralRequestStatusDeprovision ||
+		cr.Status.AtProvider.Status == rhacs.CentralRequestStatusDeleting {
+		return nil
+	}
 
 	resp, err := c.client.DeleteCentralById(ctx, cr.Status.AtProvider.ID, true)
 	if resp != nil {
