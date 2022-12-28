@@ -378,6 +378,91 @@ func TestCreate(t *testing.T) {
 	}
 }
 
+func TestUpdate(t *testing.T) {
+	type args struct {
+		ctx context.Context
+		mg  resource.Managed
+	}
+
+	type want struct {
+		obs managed.ExternalUpdate
+		mg  resource.Managed
+		err error
+	}
+
+	cases := []struct {
+		name   string
+		client fleetmanager.PublicAPI
+		args   args
+		want   want
+	}{
+		{
+			name: "update success",
+			client: &fleetmanager.PublicAPIMock{
+				DeleteCentralByIdFunc: func(ctx context.Context, id string, async bool) (*http.Response, error) {
+					return nil, nil
+				},
+			},
+			args: args{
+				ctx: context.Background(),
+				mg:  centralInstance(withStatus(rhacs.CentralRequestStatusReady)),
+			},
+			want: want{
+				mg:  centralInstance(withStatus(rhacs.CentralRequestStatusReady), withConditions(xpv1.Deleting())),
+				err: nil,
+			},
+		},
+		{
+			name: "update not ready",
+			client: &fleetmanager.PublicAPIMock{
+				DeleteCentralByIdFunc: func(ctx context.Context, id string, async bool) (*http.Response, error) {
+					return nil, errors.New("should never reach this error")
+				},
+			},
+			args: args{
+				ctx: context.Background(),
+				mg:  centralInstance(withStatus(rhacs.CentralRequestStatusDeprovision)),
+			},
+			want: want{
+				mg:  centralInstance(withConditions(xpv1.Deleting()), withStatus(rhacs.CentralRequestStatusDeprovision)),
+				err: nil,
+			},
+		},
+		{
+			name: "update error",
+			client: &fleetmanager.PublicAPIMock{
+				DeleteCentralByIdFunc: func(ctx context.Context, id string, async bool) (*http.Response, error) {
+					return nil, errors.New(errUpdateFailed)
+				},
+			},
+			args: args{
+				ctx: context.Background(),
+				mg:  centralInstance(withStatus(rhacs.CentralRequestStatusReady)),
+			},
+			want: want{
+				mg:  centralInstance(withStatus(rhacs.CentralRequestStatusReady), withConditions(xpv1.Deleting())),
+				err: cmpopts.AnyError,
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			e := external{client: tc.client}
+			got, err := e.Update(tc.args.ctx, tc.args.mg)
+			if diff := cmp.Diff(tc.want.err, err, cmpopts.EquateErrors()); diff != "" {
+				t.Errorf("\ne.Update(...): -want error, +got error:\n%s\n", diff)
+			}
+			if diff := cmp.Diff(tc.want.obs, got); diff != "" {
+				t.Errorf("\ne.Update(...): -want, +got:\n%s\n", diff)
+			}
+			if diff := cmp.Diff(tc.want.mg, tc.args.mg); diff != "" {
+				t.Errorf("\ne.Update(...): -want, +got:\n%s\n", diff)
+			}
+		})
+	}
+}
+
 func TestDelete(t *testing.T) {
 	type args struct {
 		ctx context.Context
@@ -385,7 +470,6 @@ func TestDelete(t *testing.T) {
 	}
 
 	type want struct {
-		obs managed.ExternalCreation
 		mg  resource.Managed
 		err error
 	}
@@ -451,10 +535,10 @@ func TestDelete(t *testing.T) {
 			e := external{client: tc.client}
 			err := e.Delete(tc.args.ctx, tc.args.mg)
 			if diff := cmp.Diff(tc.want.err, err, cmpopts.EquateErrors()); diff != "" {
-				t.Errorf("\ne.Create(...): -want error, +got error:\n%s\n", diff)
+				t.Errorf("\ne.Delete(...): -want error, +got error:\n%s\n", diff)
 			}
 			if diff := cmp.Diff(tc.want.mg, tc.args.mg); diff != "" {
-				t.Errorf("\ne.Create(...): -want, +got:\n%s\n", diff)
+				t.Errorf("\ne.Delete(...): -want, +got:\n%s\n", diff)
 			}
 		})
 	}
