@@ -42,7 +42,7 @@ import (
 	"github.com/stehessel/provider-redhat/apis/rhacs/v1alpha1"
 	apisv1alpha1 "github.com/stehessel/provider-redhat/apis/v1alpha1"
 	"github.com/stehessel/provider-redhat/pkg/clients/rhacs"
-	"github.com/stehessel/provider-redhat/pkg/controller/features"
+	"github.com/stehessel/provider-redhat/pkg/features"
 )
 
 const (

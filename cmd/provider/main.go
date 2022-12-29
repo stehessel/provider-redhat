@@ -39,7 +39,7 @@ import (
 	"github.com/stehessel/provider-redhat/apis"
 	"github.com/stehessel/provider-redhat/apis/v1alpha1"
 	redhat "github.com/stehessel/provider-redhat/pkg/controller"
-	"github.com/stehessel/provider-redhat/pkg/controller/features"
+	"github.com/stehessel/provider-redhat/pkg/features"
 )
 
 func main() {
