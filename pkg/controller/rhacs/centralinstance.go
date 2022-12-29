@@ -204,6 +204,7 @@ func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.Ex
 	condition := getCondition(cr.Status.AtProvider.Status)
 	cr.SetConditions(condition)
 	upToDate, diff := isUpToDate(cr, &centralResp)
+
 	return managed.ExternalObservation{
 		ResourceExists:   true,
 		ResourceUpToDate: upToDate,
@@ -216,7 +217,6 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 	if !ok {
 		return managed.ExternalCreation{}, errors.New(errNotCentralInstance)
 	}
-
 	cr.SetConditions(xpv1.Creating())
 
 	request := public.CentralRequestPayload{
