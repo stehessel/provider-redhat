@@ -3,7 +3,7 @@ kind: Provider
 metadata:
   name: provider-redhat
   annotations:
-    meta.crossplane.io/maintainer: Crossplane Maintainers <info@crossplane.io>
+    meta.crossplane.io/maintainer: Stephan Heßelmann <stephan@stehessel.de>
     meta.crossplane.io/source: github.com/stehessel/provider-redhat
     meta.crossplane.io/license: Apache-2.0
     meta.crossplane.io/description: |
