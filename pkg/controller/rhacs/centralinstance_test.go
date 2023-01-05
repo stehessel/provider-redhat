@@ -58,8 +58,8 @@ type (
 	centralInstanceModifier func(*v1alpha1.CentralInstance)
 )
 
-func withRequestName(name string) centralRequestModifier {
-	return func(c *public.CentralRequest) { c.Name = name }
+func withRequestRegion(region string) centralRequestModifier {
+	return func(c *public.CentralRequest) { c.Region = region }
 }
 
 func withRequestStatus(status string) centralRequestModifier {
@@ -72,6 +72,10 @@ func withConditions(c ...xpv1.Condition) centralInstanceModifier {
 
 func withName(name string) centralInstanceModifier {
 	return func(c *v1alpha1.CentralInstance) { c.Status.AtProvider.Name = name }
+}
+
+func withRegion(region string) centralInstanceModifier {
+	return func(c *v1alpha1.CentralInstance) { c.Status.AtProvider.Region = v1alpha1.Region(region) }
 }
 
 func withStatus(status string) centralInstanceModifier {
@@ -156,8 +160,9 @@ func TestObserve(t *testing.T) {
 		{
 			name: "observation no diff",
 			client: &fleetmanager.PublicAPIMock{
-				GetCentralByIdFunc: func(ctx context.Context, id string) (public.CentralRequest, *http.Response, error) {
-					return centralRequest(), nil, nil
+				GetCentralsFunc: func(ctx context.Context, localVarOptionals *public.GetCentralsOpts) (public.CentralRequestList, *http.Response, error) {
+					central := centralRequest()
+					return public.CentralRequestList{Items: []public.CentralRequest{central}}, nil, nil
 				},
 			},
 			args: args{
@@ -176,8 +181,9 @@ func TestObserve(t *testing.T) {
 		{
 			name: "observation diff",
 			client: &fleetmanager.PublicAPIMock{
-				GetCentralByIdFunc: func(ctx context.Context, id string) (public.CentralRequest, *http.Response, error) {
-					return centralRequest(withRequestName("new-name")), nil, nil
+				GetCentralsFunc: func(ctx context.Context, localVarOptionals *public.GetCentralsOpts) (public.CentralRequestList, *http.Response, error) {
+					central := centralRequest(withRequestRegion("new-region"))
+					return public.CentralRequestList{Items: []public.CentralRequest{central}}, nil, nil
 				},
 			},
 			args: args{
@@ -189,15 +195,16 @@ func TestObserve(t *testing.T) {
 					ResourceExists:   true,
 					ResourceUpToDate: false,
 				},
-				mg:  centralInstance(withName("new-name"), withConditions(xpv1.Available())),
+				mg:  centralInstance(withConditions(xpv1.Available()), withRegion("new-region")),
 				err: nil,
 			},
 		},
 		{
 			name: "observation while creating",
 			client: &fleetmanager.PublicAPIMock{
-				GetCentralByIdFunc: func(ctx context.Context, id string) (public.CentralRequest, *http.Response, error) {
-					return centralRequest(withRequestStatus(rhacs.CentralRequestStatusAccepted)), nil, nil
+				GetCentralsFunc: func(ctx context.Context, localVarOptionals *public.GetCentralsOpts) (public.CentralRequestList, *http.Response, error) {
+					central := centralRequest(withRequestStatus(rhacs.CentralRequestStatusAccepted))
+					return public.CentralRequestList{Items: []public.CentralRequest{central}}, nil, nil
 				},
 			},
 			args: args{
@@ -216,8 +223,9 @@ func TestObserve(t *testing.T) {
 		{
 			name: "observation while available",
 			client: &fleetmanager.PublicAPIMock{
-				GetCentralByIdFunc: func(ctx context.Context, id string) (public.CentralRequest, *http.Response, error) {
-					return centralRequest(withRequestStatus(rhacs.CentralRequestStatusReady)), nil, nil
+				GetCentralsFunc: func(ctx context.Context, localVarOptionals *public.GetCentralsOpts) (public.CentralRequestList, *http.Response, error) {
+					central := centralRequest(withRequestStatus(rhacs.CentralRequestStatusReady))
+					return public.CentralRequestList{Items: []public.CentralRequest{central}}, nil, nil
 				},
 			},
 			args: args{
@@ -236,8 +244,9 @@ func TestObserve(t *testing.T) {
 		{
 			name: "observation while deleting",
 			client: &fleetmanager.PublicAPIMock{
-				GetCentralByIdFunc: func(ctx context.Context, id string) (public.CentralRequest, *http.Response, error) {
-					return centralRequest(withRequestStatus(rhacs.CentralRequestStatusDeleting)), nil, nil
+				GetCentralsFunc: func(ctx context.Context, localVarOptionals *public.GetCentralsOpts) (public.CentralRequestList, *http.Response, error) {
+					central := centralRequest(withRequestStatus(rhacs.CentralRequestStatusDeleting))
+					return public.CentralRequestList{Items: []public.CentralRequest{central}}, nil, nil
 				},
 			},
 			args: args{
@@ -256,8 +265,8 @@ func TestObserve(t *testing.T) {
 		{
 			name: "observation no central found",
 			client: &fleetmanager.PublicAPIMock{
-				GetCentralByIdFunc: func(ctx context.Context, id string) (public.CentralRequest, *http.Response, error) {
-					return public.CentralRequest{}, makeHTTPResponse(http.StatusNotFound), errors.New(errGetFailed)
+				GetCentralsFunc: func(ctx context.Context, localVarOptionals *public.GetCentralsOpts) (public.CentralRequestList, *http.Response, error) {
+					return public.CentralRequestList{}, nil, nil
 				},
 			},
 			args: args{
@@ -273,8 +282,8 @@ func TestObserve(t *testing.T) {
 		{
 			name: "observation error during get",
 			client: &fleetmanager.PublicAPIMock{
-				GetCentralByIdFunc: func(ctx context.Context, id string) (public.CentralRequest, *http.Response, error) {
-					return public.CentralRequest{}, nil, errors.New(errGetFailed)
+				GetCentralsFunc: func(ctx context.Context, localVarOptionals *public.GetCentralsOpts) (public.CentralRequestList, *http.Response, error) {
+					return public.CentralRequestList{}, nil, errors.New(errGetFailed)
 				},
 			},
 			args: args{
@@ -338,7 +347,7 @@ func TestCreate(t *testing.T) {
 			},
 			want: want{
 				obs: managed.ExternalCreation{},
-				mg:  centralInstance(withConditions(xpv1.Creating()), withExternalName(id)),
+				mg:  centralInstance(withConditions(xpv1.Creating()), withExternalName(name)),
 				err: nil,
 			},
 		},

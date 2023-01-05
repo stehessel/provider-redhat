@@ -18,7 +18,6 @@ package rhacs
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -51,6 +50,7 @@ const (
 	errGetPC              = "cannot get ProviderConfig"
 	errGetCreds           = "cannot get credentials"
 	errGetFailed          = "cannot get central instance"
+	errObserveFailed      = "cannot observe central instance"
 	errCreateFailed       = "cannot create central instance"
 	errUpdateFailed       = "cannot update central instance"
 	errDeleteFailed       = "cannot delete central instance"
@@ -181,29 +181,43 @@ func isUpToDate(in *v1alpha1.CentralInstance, observed *public.CentralRequest) (
 	return true, ""
 }
 
+func (c *external) getCentralInstance(ctx context.Context, cr *v1alpha1.CentralInstance) (*public.CentralRequest, error) {
+	centralList, resp, err := c.client.GetCentrals(ctx, nil)
+	if resp != nil {
+		if err := resp.Body.Close(); err != nil {
+			return nil, errors.Wrap(err, errGetFailed)
+		}
+	}
+	if err != nil {
+		return nil, errors.Wrap(err, errGetFailed)
+	}
+	for _, it := range centralList.Items {
+		if it.Name == cr.Spec.ForProvider.Name {
+			return &it, nil
+		}
+	}
+	return nil, nil
+}
+
 func (c *external) Observe(ctx context.Context, mg resource.Managed) (managed.ExternalObservation, error) {
 	cr, ok := mg.(*v1alpha1.CentralInstance)
 	if !ok {
 		return managed.ExternalObservation{}, errors.New(errNotCentralInstance)
 	}
 
-	centralResp, resp, err := c.client.GetCentralById(ctx, meta.GetExternalName(cr))
-	if resp != nil {
-		if err := resp.Body.Close(); err != nil {
-			return managed.ExternalObservation{}, errors.Wrap(err, errGetFailed)
-		}
-	}
+	central, err := c.getCentralInstance(ctx, cr)
 	if err != nil {
-		if resp != nil && resp.StatusCode == http.StatusNotFound {
-			return managed.ExternalObservation{ResourceExists: false}, nil
-		}
-		return managed.ExternalObservation{}, errors.Wrap(err, errGetFailed)
+		return managed.ExternalObservation{}, errors.Wrap(err, errObserveFailed)
+	}
+	if central == nil {
+		return managed.ExternalObservation{ResourceExists: false}, nil
 	}
 
-	cr.Status.AtProvider = generateObservation(&centralResp)
+	cr.Status.AtProvider = generateObservation(central)
 	condition := getCondition(cr.Status.AtProvider.Status)
 	cr.SetConditions(condition)
-	upToDate, diff := isUpToDate(cr, &centralResp)
+	meta.SetExternalName(cr, central.Name)
+	upToDate, diff := isUpToDate(cr, central)
 
 	return managed.ExternalObservation{
 		ResourceExists:   true,
@@ -233,7 +247,7 @@ func (c *external) Create(ctx context.Context, mg resource.Managed) (managed.Ext
 		}
 	}
 	if err == nil {
-		meta.SetExternalName(cr, centralResp.Id)
+		meta.SetExternalName(cr, centralResp.Name)
 	}
 	return managed.ExternalCreation{}, errors.Wrap(err, errCreateFailed)
 }
