@@ -141,6 +141,6 @@ replace (
 	github.com/heroku/docker-registry-client => github.com/stackrox/docker-registry-client v0.0.0-20220204234128-07f109db0819
 	github.com/operator-framework/helm-operator-plugins => github.com/stackrox/helm-operator v0.0.8-0.20220506091602-3764c49abfb3
 	github.com/stackrox/acs-fleet-manager => github.com/stehessel/acs-fleet-manager v0.0.0-20221225165722-a975149bad36
-	github.com/stackrox/rox => github.com/stackrox/stackrox v0.0.0-20221213204921-1b6ae2de7ff4
+	github.com/stackrox/rox => github.com/stackrox/stackrox v0.0.0-20230125233108-2bd26143bfbe
 	go.uber.org/zap => github.com/stackrox/zap v1.15.1-0.20200720133746-810fd602fd0f
 )
