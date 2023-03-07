@@ -17,9 +17,7 @@ limitations under the License.
 package rhacs
 
 import (
-	"bytes"
 	"context"
-	"io"
 	"net/http"
 	"testing"
 
@@ -68,10 +66,6 @@ func withRequestStatus(status string) centralRequestModifier {
 
 func withConditions(c ...xpv1.Condition) centralInstanceModifier {
 	return func(r *v1alpha1.CentralInstance) { r.Status.ConditionedStatus.Conditions = c }
-}
-
-func withName(name string) centralInstanceModifier {
-	return func(c *v1alpha1.CentralInstance) { c.Status.AtProvider.Name = name }
 }
 
 func withRegion(region string) centralInstanceModifier {
@@ -128,15 +122,6 @@ func centralInstance(mod ...centralInstanceModifier) *v1alpha1.CentralInstance {
 		m(c)
 	}
 	return c
-}
-
-func makeHTTPResponse(statusCode int) *http.Response {
-	response := &http.Response{
-		Body:       io.NopCloser(bytes.NewBufferString(`{}`)),
-		Header:     http.Header{},
-		StatusCode: statusCode,
-	}
-	return response
 }
 
 func TestObserve(t *testing.T) {
