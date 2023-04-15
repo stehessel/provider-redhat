@@ -35,7 +35,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: A CentralInstance is an example API type.
+        description: A CentralInstance represents an ACS Central instance.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
